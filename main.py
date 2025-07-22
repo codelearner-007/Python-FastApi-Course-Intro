@@ -19,15 +19,15 @@ class Post(BaseModel):
 
 
 # This we make a my_post data array for every now post we make from front end
-my_post = [{"title": "title of post 1",
-            "content": "content of post 1", "id": 1}, {"title": "favirot food", "content": "I like pizza", "id": 2}]
+my_post = [{"title": "title of post 1", "content": "content of post 1", "id": 1},
+           {"title": "favirot food", "content": "I like pizza", "id": 2}]
 
 
 # This is the "find product" function having argument of "id"
 def find_post(id):
-    for p in my_post:
-        if p["id"] == id:
-            return p
+    for post in my_post:
+        if post['id'] == id:
+            return post
 
 
 @app.get("/")
@@ -40,15 +40,6 @@ def get_post():
     return {'data': my_post}
 
 
-# //////////////////////////////////////////////
-# These are same code with a differenet thing that if we have a id field in the model the then we just access it using "." and the assign a random value
-# @app.post("/posts")
-# def create_posts(post: Post):
-#     post.id = randrange(0, 10000000)
-#     my_post.append(post)
-# #     return {'data': post}
-#     return {'Message ': "New post created"}
-
 # In that case the model do not have the "id" in it and we create the id for the every post which we create
 @app.post("/posts")
 def create_posts(post: Post):
@@ -57,6 +48,12 @@ def create_posts(post: Post):
     my_post.append(post_dict)
     # return {'data': post_dict}
     return {'Message ': "New post created"}
+
+
+@app.get("/posts/latest")
+def get_latest_post():
+    latest_post = my_post[len(my_post)-1]
+    return {"detail": latest_post}
 
 
 # ///////////////////////////////////////////
