@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status, HTTPException
 from fastapi.params import Body
 from pydantic import BaseModel  # This is for importing the base model
 from typing import Optional
@@ -41,7 +41,7 @@ def get_post():
 
 
 # In that case the model do not have the "id" in it and we create the id for the every post which we create
-@app.post("/posts")
+@app.post("/posts", status_code=status.HTTP_201_CREATED)
 def create_posts(post: Post):
     post_dict = post.dict()
     post_dict["id"] = randrange(0, 10000000)
@@ -59,11 +59,16 @@ def get_latest_post():
 # ///////////////////////////////////////////
 # Get Post by ID:
 @app.get("/posts/{id}")  # This is for the URL
-def get_post(id: int):  # we get the id is parameter like "2" and validate it as string now if the id is not a integer entered by the user thn it shows that the id is not a integer other wise it gives the generic error
+def get_post(id: int, response: Response):  # we get the id is parameter like "2" and validate it as string now if the id is not a integer entered by the user thn it shows that the id is not a integer other wise it gives the generic error
 
     # We find the product using the "id" received and save it into a new variable "post"
     print(type(id))  # Here in print it show that type of id is a string type
     post = find_post(id)  # NOW HERE THE type is integer
+
+    # Lets suppose We don't have the post which the user want then
+    if not post:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"post with id: {id} not found")
     return {"post Detail":  post}
 
 # Special NOte
