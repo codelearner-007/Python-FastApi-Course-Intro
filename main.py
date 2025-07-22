@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Response, status, HTTPException
+from fastapi import FastAPI, status, HTTPException, Response
 from fastapi.params import Body
 from pydantic import BaseModel  # This is for importing the base model
 from typing import Optional
@@ -28,6 +28,14 @@ def find_post(id):
     for post in my_post:
         if post['id'] == id:
             return post
+
+#  Here we find the "index" of the delete post id
+
+
+def find_index_post(id):
+    for i, post in enumerate(my_post):
+        if post['id'] == id:
+            return i
 
 
 @app.get("/")
@@ -59,7 +67,7 @@ def get_latest_post():
 # ///////////////////////////////////////////
 # Get Post by ID:
 @app.get("/posts/{id}")  # This is for the URL
-def get_post(id: int, response: Response):  # we get the id is parameter like "2" and validate it as string now if the id is not a integer entered by the user thn it shows that the id is not a integer other wise it gives the generic error
+def get_post(id: int):  # we get the id is parameter like "2" and validate it as string now if the id is not a integer entered by the user thn it shows that the id is not a integer other wise it gives the generic error
 
     # We find the product using the "id" received and save it into a new variable "post"
     print(type(id))  # Here in print it show that type of id is a string type
@@ -74,3 +82,14 @@ def get_post(id: int, response: Response):  # we get the id is parameter like "2
 # Special NOte
 # Any time we have a path parameter like "@app.get("/posts/{id}")"  its result is always be a string like in this case there is a "2" but this is a string type
 # we have to manually convert it into a integer so that we can get the 2 post
+
+
+@app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(id: int):
+    # deleting post
+    index = find_index_post(id)
+    if not index:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"post with id: {id} does not exist")
+    my_post.pop(index)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
