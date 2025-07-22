@@ -88,8 +88,24 @@ def get_post(id: int):  # we get the id is parameter like "2" and validate it as
 def delete_post(id: int):
     # deleting post
     index = find_index_post(id)
-    if not index:
+    if index == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"post with id: {id} does not exist")
     my_post.pop(index)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.put("/posts/{id}")
+def update_post(id: int, post: Post):
+    index = find_index_post(id)
+    print(index)
+    if index == None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Post with id: {id} does not exist.")
+
+    print(post)
+    post_dict = post.dict()
+    print(post_dict)
+    post_dict['id'] = id
+    my_post[index] = post_dict
+    return {"data": post_dict}
