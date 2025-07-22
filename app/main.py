@@ -108,4 +108,5 @@ def update_post(id: int, post: Post):
     print(post_dict)
     post_dict['id'] = id
     my_post[index] = post_dict
+    # my_post[index] get the old post replace it with new post "post_dict"
     return {"data": post_dict}
