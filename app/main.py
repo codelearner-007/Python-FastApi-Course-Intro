@@ -1,21 +1,22 @@
-from fastapi import FastAPI, status, HTTPException, Response
+from typing import Optional , List
+from fastapi import FastAPI, status, HTTPException, Response, Depends
 from fastapi.params import Body
-from pydantic import BaseModel  # This is for importing the base model
-from typing import Optional
 from random import randrange  # This is for the random number used in id
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
+from sqlalchemy.orm import Session
+from . import models , schemas
+from .database import engine, get_db
+from .models import User
+
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+
 # This is the base model for the Post Request
 
-
-class Post(BaseModel):
-    title: str  # it define the types of data received from front end
-    content: str
-    published: bool = True  # It comes with default condition as "True"
 
 
 while True:
@@ -54,81 +55,113 @@ def find_index_post(id):
 def home():
     return {"message": "Hello World"}
 
-# Here we get all the post available in the array
+
+# .................................................................................
+# .......................... get function for post .............................
 
 
-@app.get("/posts")
-def get_post():
-    cursor.execute(""" SELECT * FROM posts""")
-    posts = cursor.fetchall()
-    print(posts)
-    return {'data': posts}
+@app.get("/posts", response_model=list[schemas.Post])
+def get_post(db: Session = Depends(get_db)):
+    posts = db.query(models.Post).all()
+    return posts
 
 
-# In that case the model do not have the "id" in it and we create the id for the every post which we create
-@app.post("/posts", status_code=status.HTTP_201_CREATED)
-def create_posts(post: Post):
-    cursor.execute(""" INSERT INTO posts (title,content,published) VALUES (%s , %s ,%s) RETURNING * """,
-                   (post.title, post.content, post.published))
-    new_post = cursor.fetchone()
-    conn.commit()
-    return {'data': new_post}
+# .................................................................................
+# .......................... post method for post .............................
+
+
+@app.post("/posts", status_code=status.HTTP_201_CREATED, response_model= schemas.Post)
+def create_posts(post: schemas.PostCreate, db: Session = Depends(get_db)):
+
+    new_post = models.Post(**post.dict())
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
+    return new_post
+
+
+# .......................... get method for latest post .............................
+# .................................................................................
 
 
 @app.get("/posts/latest")
 def get_latest_post():
     latest_post = my_post[len(my_post)-1]
-    return {"detail": latest_post}
+    return latest_post
 
 
-# ///////////////////////////////////////////
-# Get Post by ID:
-@app.get("/posts/{id}")  # This is for the URL
-def get_post(id: int):  # we get the id is parameter like "2" and validate it as string now if the id is not a integer entered by the user then it shows that the id is not a integer other wise it gives the generic error
-    cursor.execute("""SELECT * FROM posts WHERE id = %s """, (str(id)))
-    post = cursor.fetchone()
+# .................................................................................
+# .......................... get method for specific post  .......................
 
-    # Lets suppose We don't have the post which the user want then
+@app.get("/posts/{id}", response_model=schemas.Post)
+def get_post(id: int, db: Session = Depends(get_db)):
+
+    post = db.query(models.Post).filter(models.Post.id == id).first()
+
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"post with id: {id} not found")
-    return {"post Detail":  post}
-
-# Special NOte
-# Any time we have a path parameter like "@app.get("/posts/{id}")"  its result is always be a string like in this case there is a "2" but this is a string type
-# we have to manually convert it into a integer so that we can get the 2 post
+    return post
 
 
-# ---- This is the delete case -----#
-# In this we find the index of the post which we want to delete. If index not found then it means that the post is not there. but if found the my_post.pop(index) will remove the post
+# .................................................................................
+# .......................... delete method for specific post .......................
+
 
 @app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(id: int):
-    # deleting post
+def delete_post(id: int, db: Session = Depends(get_db)):
 
-    cursor.execute(
-        """ DELETE FROM posts WHERE id = %s returning * """, (str(id),))
-    delete_post = cursor.fetchone()
-    conn.commit()
-
-    if delete_post == None:
+    post = db.query(models.Post).filter(models.Post.id == id)
+    if post.first() == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"post with id: {id} does not exist")
 
+    post.delete(synchronize_session=False)
+    db.commit()
+    
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-# ---- This is the Update case -----#
-@app.put("/posts/{id}")
-def update_post(id: int, post: Post):
-    cursor.execute("""UPDATE posts SET title = %s , content = %s , published = %s WHERE id = %s RETURNING * """,
-                   (post.title, post.content, post.published, str(id)))
-    updated_post = cursor.fetchone()
-    conn.commit()
+# .................................................................................
+# .......................... update method for specific post .......................
 
-    if updated_post == None:
+
+
+@app.put("/posts/{id}", response_model=schemas.Post)
+def update_post(id: int, updated_post: schemas.PostCreate , db: Session = Depends(get_db)):
+   
+    post_query = db.query(models.Post).filter(models.Post.id == id)
+    post = post_query.first()
+    
+    if post == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Post with id: {id} does not exist.")
 
+    post_query.update(updated_post.dict(), synchronize_session=False)
+    db.commit()
+    
     # my_post[index] get the old post replace it with new post "post_dict"
-    return {"data": updated_post}
+    return post_query.first()
+
+
+# .................................................................................
+# .................................................................................
+# ..........................********** USER DATA ********** .......................
+# .................................................................................
+# .................................................................................
+
+# .................................................................................
+# .......................... post method for post .............................
+
+
+@app.post("/users", status_code=status.HTTP_201_CREATED, response_model=schemas.UserOut)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    
+    print(user.dict())
+    new_user = User(**user.dict())
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return new_user
+
